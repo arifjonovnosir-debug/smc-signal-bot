@@ -1,36 +1,54 @@
-
 from flask import Flask, request, jsonify
-import requests
 import os
+import requests
 
 app = Flask(__name__)
 
-TOKEN  = os.getenv("TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
-CHATID = os.getenv("CHATID", "YOUR_CHAT_ID")
-URL    = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+TOKEN = os.getenv("TOKEN")
+CHATID = os.getenv("CHATID")
 
-@app.route("/signal", methods=["POST"])
+# --- Signal Route ---
+@app.post("/signal")
 def signal():
-    data = request.get_json(force=True)
-    raw = data.get("signal", "")
-    parts = raw.split("|")
     try:
-        direction = parts[0]
-        entry = parts[1].split("=")[1]
-        tp = parts[2].split("=")[1]
-        sl = parts[3].split("=")[1]
-    except:
-        return jsonify({"error":"parse failed"})
+        data = request.json
 
-    ticker = data.get("ticker","-")
-    tf = data.get("tf","-")
-    time = data.get("time","-")
+        signal_text = data.get("signal", "No signal")
+        ticker = data.get("ticker", "Unknown")
+        price = data.get("price", "0")
+        tf = data.get("tf", "N/A")
+        time = data.get("time", "N/A")
 
-    head = "🟢 LONG" if direction=="LONG" else "🔴 SHORT"
-    msg = f"{head}\nTicker: {ticker}\nTF: {tf}\nTime: {time}\nEntry: {entry}\nTP: {tp}\nSL: {sl}"
+        message = f"""
+📡 *TRADING SIGNAL*
+-------------------------
+📊 *Signal:* {signal_text}
+💰 *Price:* {price}
+🕒 *TF:* {tf}
+🪙 *Ticker:* {ticker}
+⏰ *Time:* {time}
+"""
 
-    requests.post(URL, json={"chat_id": CHATID, "text": msg})
-    return jsonify({"ok":True})
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        payload = {
+            "chat_id": CHATID,
+            "text": message,
+            "parse_mode": "Markdown"
+        }
+
+        r = requests.post(url, json=payload)
+
+        return jsonify({"status": "ok", "telegram": r.text})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.get("/")
+def home():
+    return "SMC SIGNAL BOT RUNNING"
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
